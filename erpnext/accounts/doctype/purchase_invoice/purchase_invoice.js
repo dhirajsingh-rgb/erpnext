@@ -31,12 +31,15 @@ erpnext.accounts.PurchaseInvoice = class PurchaseInvoice extends erpnext.buying.
 			};
 		});
 
-		this.frm.set_query("expense_account", "items", function () {
+		this.frm.set_query("expense_account", "items", function (doc, cdt, cdn) {
+			const row = locals[cdt][cdn];
 			return {
 				query: "erpnext.controllers.queries.get_expense_account",
 				filters: {
 					company: doc.company,
 					disabled: 0,
+					update_stock: doc.update_stock,
+					item_code: row.item_code,
 				},
 			};
 		});

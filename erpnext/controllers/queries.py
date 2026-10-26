@@ -977,19 +977,25 @@ def get_expense_account(doctype: str, txt: str, searchfield: str, start: int, pa
 	dt = "Account"
 
 	acc = qb.DocType(dt)
+	account_types = [
+		"Expense Account",
+		"Fixed Asset",
+		"Temporary",
+		"Asset Received But Not Billed",
+		"Capital Work in Progress",
+	]
+	# with Update Stock and perpetual inventory, Purchase Invoice sets a stock item's expense account
+	# to its warehouse's Stock account, so that account must be selectable for stock item rows
+	if (
+		filters.get("update_stock")
+		and filters.get("item_code")
+		and frappe.get_cached_value("Item", filters.get("item_code"), "is_stock_item")
+		and erpnext.is_perpetual_inventory_enabled(filters.get("company"))
+	):
+		account_types.append("Stock")
+
 	condition = [
-		(
-			acc.report_type.eq("Profit and Loss")
-			| acc.account_type.isin(
-				[
-					"Expense Account",
-					"Fixed Asset",
-					"Temporary",
-					"Asset Received But Not Billed",
-					"Capital Work in Progress",
-				]
-			)
-		),
+		(acc.report_type.eq("Profit and Loss") | acc.account_type.isin(account_types)),
 		acc.is_group.eq(0),
 		acc.disabled.eq(0),
 	]

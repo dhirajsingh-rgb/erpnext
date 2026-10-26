@@ -111,6 +111,23 @@ class TestQueries(ERPNextTestSuite):
 
 		self.assertGreaterEqual(len(query(filters={"company": "_Test Company"})), 1)
 
+	def test_expense_account_query_includes_stock_accounts_for_stock_items_with_update_stock(self):
+		query = add_default_params(queries.get_expense_account, "Account")
+
+		def accounts(company, **filters):
+			return [row[0] for row in query(txt="Stock In Hand", filters={"company": company, **filters})]
+
+		# perpetual inventory is enabled for this company
+		company, stock_account = "_Test Company with perpetual inventory", "Stock In Hand - TCP1"
+		self.assertIn(stock_account, accounts(company, update_stock=1, item_code="_Test Item"))
+		self.assertNotIn(stock_account, accounts(company, update_stock=1, item_code="_Test Non Stock Item"))
+		self.assertNotIn(stock_account, accounts(company, item_code="_Test Item"))
+
+		# without perpetual inventory the expense account is never replaced by a Stock account
+		self.assertNotIn(
+			"Stock In Hand - _TC", accounts("_Test Company", update_stock=1, item_code="_Test Item")
+		)
+
 	def test_warehouse_query(self):
 		query = add_default_params(queries.warehouse_query, "Account")
 
