@@ -3251,13 +3251,11 @@ erpnext.TransactionController = class TransactionController extends erpnext.taxe
 
 	// The server validates the due date against the template's last term, so keep them in step.
 	set_due_date_from_payment_schedule(payment_schedule) {
-		if (!this.frm.fields_dict.due_date || !payment_schedule.length) return;
+		const due_dates = payment_schedule.map((row) => row.due_date).filter(Boolean);
+		if (!this.frm.fields_dict.due_date || !due_dates.length) return;
 
 		// set directly: set_value would trigger due_date(), which offers to clear the template
-		this.frm.doc.due_date = payment_schedule
-			.map((row) => row.due_date)
-			.sort()
-			.pop();
+		this.frm.doc.due_date = due_dates.sort().pop();
 		this.frm.refresh_field("due_date");
 	}
 

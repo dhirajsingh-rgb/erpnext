@@ -10,14 +10,18 @@ const SOURCE = path.resolve(
   "../../public/js/controllers/transaction.js"
 );
 
-// loads TransactionController with frappe.call answering every request with `response`
-function controller(doc, { response, has_due_date = true } = {}) {
+const GET_DUE_DATE = "erpnext.accounts.party.get_due_date";
+const GET_PAYMENT_TERMS =
+  "erpnext.controllers.accounts_controller.get_payment_terms";
+
+// loads TransactionController with frappe.call answering each method from `responses`
+function controller(doc, { responses, has_due_date = true } = {}) {
   const calls = [];
   const set_values = [];
   const frappe = {
     call: (opts) => {
       calls.push(opts);
-      opts.callback?.({ message: response });
+      opts.callback?.({ message: responses[opts.method] });
     },
     ui: { form: { trigger: () => {} } },
   };
@@ -40,7 +44,6 @@ function controller(doc, { response, has_due_date = true } = {}) {
   };
   me.get_company_currency = () => "INR";
   me.update_payment_schedule_grid_labels = () => {};
-  me.recalculate_terms = () => {};
   return { me, calls, set_values };
 }
 
@@ -59,7 +62,7 @@ describe("Payment terms template on an invoice", () => {
   it("moves the due date to the regenerated payment schedule", () => {
     const doc = invoice();
     const { me, set_values } = controller(doc, {
-      response: [{ due_date: "2026-11-10" }],
+      responses: { [GET_PAYMENT_TERMS]: [{ due_date: "2026-11-10" }] },
     });
 
     me.payment_terms_template();
@@ -72,7 +75,12 @@ describe("Payment terms template on an invoice", () => {
   it("uses the last instalment when the template has several terms", () => {
     const doc = invoice();
     const { me } = controller(doc, {
-      response: [{ due_date: "2026-12-10" }, { due_date: "2026-11-10" }],
+      responses: {
+        [GET_PAYMENT_TERMS]: [
+          { due_date: "2026-12-10" },
+          { due_date: "2026-11-10" },
+        ],
+      },
     });
 
     me.payment_terms_template();
@@ -80,10 +88,23 @@ describe("Payment terms template on an invoice", () => {
     assert.equal(doc.due_date, "2026-12-10");
   });
 
+  it("ignores schedule rows without a due date", () => {
+    const doc = invoice();
+    const { me } = controller(doc, {
+      responses: {
+        [GET_PAYMENT_TERMS]: [{ due_date: "2026-11-10" }, { due_date: null }],
+      },
+    });
+
+    me.payment_terms_template();
+
+    assert.equal(doc.due_date, "2026-11-10");
+  });
+
   it("leaves documents without a due date alone", () => {
     const doc = invoice({ doctype: "Sales Order", due_date: undefined });
     const { me } = controller(doc, {
-      response: [{ due_date: "2026-11-10" }],
+      responses: { [GET_PAYMENT_TERMS]: [{ due_date: "2026-11-10" }] },
       has_due_date: false,
     });
 
@@ -92,14 +113,21 @@ describe("Payment terms template on an invoice", () => {
     assert.equal(doc.due_date, undefined);
   });
 
-  it("asks for the due date of the invoice's own template when the posting date changes", () => {
+  it("follows the invoice's own template when the posting date changes", () => {
     const doc = invoice({ posting_date: "2026-10-30" });
-    const { me, calls } = controller(doc, { response: "2026-11-14" });
+    const { me, calls } = controller(doc, {
+      responses: {
+        [GET_DUE_DATE]: "2026-11-14",
+        [GET_PAYMENT_TERMS]: [{ due_date: "2026-11-14" }],
+      },
+    });
 
     me.posting_date();
 
-    assert.equal(calls[0].method, "erpnext.accounts.party.get_due_date");
+    assert.equal(calls[0].method, GET_DUE_DATE);
     assert.equal(calls[0].args.template_name, "Test 15 Days");
+    // the schedule is regenerated afterwards and has the last word
+    assert.equal(calls.at(-1).method, GET_PAYMENT_TERMS);
     assert.equal(doc.due_date, "2026-11-14");
   });
 });
