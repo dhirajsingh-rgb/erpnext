@@ -1392,6 +1392,7 @@ erpnext.TransactionController = class TransactionController extends erpnext.taxe
 						party:
 							me.frm.doc.doctype == "Sales Invoice" ? me.frm.doc.customer : me.frm.doc.supplier,
 						company: me.frm.doc.company,
+						template_name: me.frm.doc.payment_terms_template,
 					},
 					callback: function (r, rt) {
 						if (r.message) {
@@ -3239,12 +3240,25 @@ erpnext.TransactionController = class TransactionController extends erpnext.taxe
 				callback: function (r) {
 					if (r.message && !r.exc) {
 						me.frm.set_value("payment_schedule", r.message);
+						me.set_due_date_from_payment_schedule(r.message);
 						const company_currency = me.get_company_currency();
 						me.update_payment_schedule_grid_labels(company_currency);
 					}
 				},
 			});
 		}
+	}
+
+	// The server validates the due date against the template's last term, so keep them in step.
+	set_due_date_from_payment_schedule(payment_schedule) {
+		if (!this.frm.fields_dict.due_date || !payment_schedule.length) return;
+
+		// set directly: set_value would trigger due_date(), which offers to clear the template
+		this.frm.doc.due_date = payment_schedule
+			.map((row) => row.due_date)
+			.sort()
+			.pop();
+		this.frm.refresh_field("due_date");
 	}
 
 	payment_term(doc, cdt, cdn) {
