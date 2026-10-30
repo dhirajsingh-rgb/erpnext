@@ -955,6 +955,22 @@ class TestQuotation(ERPNextTestSuite):
 		expired.submit()
 		self.assertRaises(frappe.ValidationError, make_sales_invoice, expired.name)
 
+	def test_quotation_access_is_checked_before_status_and_expiry(self):
+		expired = make_quotation(do_not_submit=1)
+		expired.transaction_date = add_days(nowdate(), -10)
+		expired.valid_till = add_days(nowdate(), -5)
+		expired.submit()
+		lost = make_quotation()
+		lost.declare_enquiry_lost([{"lost_reason": self.lost_reason}], [])
+
+		for method in (make_sales_order, make_sales_invoice, make_revision):
+			self.assertRaises(frappe.DoesNotExistError, method, "_Test Missing Quotation")
+
+		with self.set_user("Guest"):
+			self.assertRaises(frappe.PermissionError, make_sales_order, expired.name)
+			self.assertRaises(frappe.PermissionError, make_sales_invoice, lost.name)
+			self.assertRaises(frappe.PermissionError, make_revision, lost.name)
+
 	def test_sales_order_cannot_be_submitted_against_a_lost_quotation(self):
 		quotation = make_quotation()
 		sales_order = make_sales_order(quotation.name)

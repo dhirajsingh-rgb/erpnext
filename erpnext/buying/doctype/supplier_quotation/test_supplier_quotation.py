@@ -455,6 +455,16 @@ class TestPurchaseOrder(ERPNextTestSuite):
 			sq.save()
 			self.assertEqual(sq.items[0].qty, 0)
 
+	def test_supplier_quotation_access_is_checked_before_expiry(self):
+		sq = frappe.copy_doc(self.globalTestRecords["Supplier Quotation"][0])
+		sq.transaction_date = add_days(today(), -10)
+		sq.valid_till = add_days(today(), -2)
+		sq.insert()
+		sq.submit()
+
+		with self.set_user("Guest"):
+			self.assertRaises(frappe.PermissionError, make_purchase_order, sq.name)
+
 	def test_make_purchase_order(self):
 		sq = frappe.copy_doc(self.globalTestRecords["Supplier Quotation"][0]).insert()
 

@@ -55,6 +55,7 @@ def validate_quotation_expiry(source_name):
 def make_sales_order(
 	source_name: str, target_doc: str | dict | Document | None = None, args: str | dict | None = None
 ):
+	frappe.get_lazy_doc("Quotation", source_name).check_permission("read")
 	validate_quotation_expiry(source_name)
 	return _make_sales_order(source_name, target_doc, args=args)
 
@@ -182,7 +183,9 @@ def _make_sales_order(source_name, target_doc=None, ignore_permissions=False, ar
 def make_sales_invoice(
 	source_name: str, target_doc: str | dict | Document | None = None, args: str | dict | None = None
 ):
-	if frappe.db.get_value("Quotation", source_name, "status") == "Lost":
+	quotation = frappe.get_lazy_doc("Quotation", source_name)
+	quotation.check_permission("read")
+	if quotation.status == "Lost":
 		frappe.throw(_("Cannot create a Sales Invoice against Lost Quotation {0}.").format(source_name))
 
 	validate_quotation_expiry(source_name)
@@ -241,7 +244,9 @@ def _make_sales_invoice(source_name, target_doc=None, ignore_permissions=False, 
 
 @frappe.whitelist()
 def make_revision(source_name: str, target_doc: str | dict | Document | None = None):
-	frappe.get_doc("Quotation", source_name).validate_can_be_revised()
+	quotation = frappe.get_lazy_doc("Quotation", source_name)
+	quotation.check_permission("read")
+	quotation.validate_can_be_revised()
 
 	def set_revision_of(source, target):
 		target.revision_of = source.revision_of or source.name

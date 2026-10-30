@@ -17,7 +17,9 @@ from erpnext.deprecation_dumpster import deprecated
 def make_purchase_order(
 	source_name: str, target_doc: str | dict | Document | None = None, args: str | dict | None = None
 ):
-	if frappe.get_doc("Supplier Quotation", source_name).get_status()["status"] == "Expired":
+	supplier_quotation = frappe.get_lazy_doc("Supplier Quotation", source_name)
+	supplier_quotation.check_permission("read")
+	if supplier_quotation.get_status()["status"] == "Expired":
 		frappe.throw(_("Supplier Quotation {0} has expired.").format(source_name))
 
 	if args is None:
